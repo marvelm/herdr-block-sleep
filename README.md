@@ -1,6 +1,6 @@
 # herdr-block-sleep
 
-Herdr plugin for macOS that prevents sleep while Herdr agents are working, but releases the assertion when the laptop lid is closed.
+- [herdr](https://herdr.dev) plugin for macOS that prevents sleep while agents are working.
 
 The plugin builds one Swift binary that owns native IOKit power assertions with `IOPMAssertionCreateWithName` and implements `start`, `stop`, `status`, and `daemon`.
 
@@ -35,7 +35,7 @@ Runtime:
 After this repository is published, install it with Herdr:
 
 ```sh
-herdr plugin install OWNER/herdr-block-sleep
+herdr plugin install marvelm/herdr-block-sleep
 ```
 
 Herdr clones the repository, runs the manifest build command, and registers the plugin:
