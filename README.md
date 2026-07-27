@@ -17,9 +17,8 @@ The monitor uses Herdr's local socket API:
 
 The helper creates these assertion types:
 
-- `PreventUserIdleSystemSleep`
-- `PreventUserIdleDisplaySleep`
-- `PreventSystemSleep`
++ `PreventUserIdleSystemSleep`
++ `PreventSystemSleep`
 
 ## Requirements
 

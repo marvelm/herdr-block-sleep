@@ -371,7 +371,6 @@ final class Monitor {
         let name = "Herdr agents working (\(reason))" as CFString
         let types = [
             kIOPMAssertionTypePreventUserIdleSystemSleep,
-            kIOPMAssertionTypePreventUserIdleDisplaySleep,
             kIOPMAssertionTypePreventSystemSleep,
         ]
 
