@@ -2,31 +2,16 @@
 
 - [herdr](https://herdr.dev) plugin for macOS that prevents sleep while agents are working.
 
-The plugin builds one Swift binary that owns native IOKit power assertions with `IOPMAssertionCreateWithName` and implements `start`, `stop`, `status`, and `daemon`.
+The plugin builds a Swift binary that sets up IOKit power assertions.
 
-## Behavior
+## Behaviour
 
-The monitor uses Herdr's local socket API:
-
-- it bootstraps state with `agent.list`
-- it subscribes to `pane.agent_status_changed` for currently known agent panes with `events.subscribe`
-- when an agent-status event arrives, it refreshes agent state and updates the power assertion
-- while waiting for Herdr events, it checks `AppleClamshellState` every 15 seconds so closing the lid releases the assertion promptly
-- every 5 minutes it reconciles with `agent.list` to discover new/removed panes and catch missed events
-- if the Herdr API fails repeatedly, it releases assertions and exits
-
-The helper creates these assertion types:
-
-+ `PreventUserIdleSystemSleep`
-+ `PreventSystemSleep`
+The monitor blocks macOS from sleeping if agents are active, and only if the laptop lid is open.
 
 ## Requirements
 
-Runtime:
-
 - macOS
 - Herdr 0.7.0 or newer
-- IOKit, `ioreg`, and system power-management services from macOS
 - Swift compiler from Xcode or Command Line Tools (`swiftc`)
 
 ## Install from GitHub
@@ -44,7 +29,7 @@ Herdr clones the repository, runs the manifest build command, and registers the 
 command = ["swiftc", "src/main.swift", "-O", "-o", "bin/herdr-block-sleep"]
 ```
 
-The startup hook starts the monitor when the Herdr server starts. To start it immediately after install:
+On first install, you'll need to manually invoke the plugin to start:
 
 ```sh
 herdr plugin action invoke start --plugin dev.herdr-block-sleep
@@ -90,10 +75,11 @@ When an agent is working and the lid is open:
 pmset -g assertions | sed -n '/herdr-block-sleep/,+8p'
 ```
 
-Expected owner:
+Expected owners include the non-display assertions only:
 
 ```text
 pid ... (herdr-block-sleep): PreventUserIdleSystemSleep named: "Herdr agents working (...)"
+pid ... (herdr-block-sleep): PreventSystemSleep named: "Herdr agents working (...)"
 ```
 
 
