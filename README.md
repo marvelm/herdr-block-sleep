@@ -16,13 +16,11 @@ The monitor blocks macOS from sleeping if agents are active, and only if the lap
 
 ## Install from GitHub
 
-After this repository is published, install it with Herdr:
-
 ```sh
 herdr plugin install marvelm/herdr-block-sleep
 ```
 
-Herdr clones the repository, runs the build command, and registers the plugin:
+Herdr will clone the repository, run the build command, and register the plugin:
 
 On first install, you'll need to manually invoke the plugin to start:
 
