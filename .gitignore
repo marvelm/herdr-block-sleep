@@ -1,3 +1,5 @@
 .build/
 bin/herdr-block-sleep
 .DS_Store
+scripts/__pycache__
+tests/__pycache__
