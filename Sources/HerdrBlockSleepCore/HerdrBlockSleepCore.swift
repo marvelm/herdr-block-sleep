@@ -3,7 +3,7 @@ import Foundation
 import IOKit
 import IOKit.pwr_mgt
 
-struct Config {
+public struct Config {
     let herdrBin: String
     let socketPath: String
     let stateDir: URL
@@ -14,7 +14,7 @@ struct Config {
     let pidURL: URL
     let statusURL: URL
 
-    init(environment: [String: String]) {
+    public init(environment: [String: String]) {
         herdrBin = environment["HERDR_BIN_PATH"] ?? "herdr"
         socketPath = environment["HERDR_SOCKET_PATH"] ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".config/herdr/herdr.sock").path
         let defaultState = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".local/state/herdr-block-sleep")
@@ -37,6 +37,31 @@ struct CommandResult {
 struct AgentSnapshot {
     let workingCount: Int
     let paneIDs: [String]
+}
+
+struct AssertionDecision: Equatable {
+    let desired: Bool
+    let reason: String
+}
+
+func assertionDecision(lid: String?, workingCount: Int) -> AssertionDecision {
+    if lid == "Yes" {
+        return AssertionDecision(desired: false, reason: "lid-closed")
+    }
+    if workingCount > 0 {
+        return AssertionDecision(desired: true, reason: "working-agents=\(workingCount)")
+    }
+    return AssertionDecision(desired: false, reason: "idle")
+}
+
+func parseAgentSnapshot(_ agents: [[String: Any]]) -> AgentSnapshot {
+    var working = 0
+    var panes: [String] = []
+    for agent in agents {
+        if let paneID = agent["pane_id"] as? String { panes.append(paneID) }
+        if (agent["agent_status"] as? String) == "working" { working += 1 }
+    }
+    return AgentSnapshot(workingCount: working, paneIDs: Array(Set(panes)).sorted())
 }
 
 struct MonitorError: Error, CustomStringConvertible {
@@ -92,8 +117,8 @@ func executableURL(for executable: String) throws -> URL {
     throw MonitorError("executable not found in PATH: \(executable)")
 }
 
-final class Termination {
-    static var requested = false
+public final class Termination {
+    public static var requested = false
 }
 
 final class SocketClient {
@@ -215,21 +240,21 @@ final class SocketClient {
     }
 }
 
-final class Monitor {
+public final class Monitor {
     private let config: Config
     private let fileManager = FileManager.default
     private var assertionIDs: [IOPMAssertionID] = []
     private var running = true
 
-    init(config: Config) {
+    public init(config: Config) {
         self.config = config
     }
 
-    func stop() {
+    public func stop() {
         running = false
     }
 
-    func run() -> Int32 {
+    public func run() -> Int32 {
         do {
             try fileManager.createDirectory(at: config.stateDir, withIntermediateDirectories: true)
             try String(ProcessInfo.processInfo.processIdentifier).write(to: config.pidURL, atomically: true, encoding: .utf8)
@@ -308,21 +333,10 @@ final class Monitor {
 
     private func apply(workingCount: Int, trigger: String) {
         let lid = lidState()
-        let reason: String
-        let desired: Bool
+        let decision = assertionDecision(lid: lid, workingCount: workingCount)
+        let reason = decision.reason
 
-        if lid == "Yes" {
-            desired = false
-            reason = "lid-closed"
-        } else if workingCount > 0 {
-            desired = true
-            reason = "working-agents=\(workingCount)"
-        } else {
-            desired = false
-            reason = "idle"
-        }
-
-        if desired {
+        if decision.desired {
             acquireAssertion(reason: reason)
         } else {
             releaseAssertion()
@@ -420,22 +434,13 @@ final class Monitor {
                   let agents = result["agents"] as? [[String: Any]] else {
                 throw MonitorError("unexpected agent.list response")
             }
-            return parseAgents(agents)
+            return parseAgentSnapshot(agents)
         } catch {
             log("socket agent.list failed; falling back to CLI: \(error)")
             return try cliAgentSnapshot()
         }
     }
 
-    private func parseAgents(_ agents: [[String: Any]]) -> AgentSnapshot {
-        var working = 0
-        var panes: [String] = []
-        for agent in agents {
-            if let paneID = agent["pane_id"] as? String { panes.append(paneID) }
-            if (agent["agent_status"] as? String) == "working" { working += 1 }
-        }
-        return AgentSnapshot(workingCount: working, paneIDs: Array(Set(panes)).sorted())
-    }
 
     private func cliAgentSnapshot() throws -> AgentSnapshot {
         let result = try run(config.herdrBin, ["agent", "list"])
@@ -448,7 +453,7 @@ final class Monitor {
               let agents = resultObject["agents"] as? [[String: Any]] else {
             throw MonitorError("unexpected Herdr agent list JSON")
         }
-        return parseAgents(agents)
+        return parseAgentSnapshot(agents)
     }
 
     private func run(_ executable: String, _ arguments: [String]) throws -> CommandResult {
@@ -471,15 +476,15 @@ final class Monitor {
     }
 }
 
-final class CLI {
+public final class CLI {
     private let config: Config
     private let fileManager = FileManager.default
 
-    init(config: Config) {
+    public init(config: Config) {
         self.config = config
     }
 
-    func start() -> Int32 {
+    public func start() -> Int32 {
         do {
             try fileManager.createDirectory(at: config.stateDir, withIntermediateDirectories: true)
         } catch {
@@ -529,7 +534,7 @@ final class CLI {
         return 0
     }
 
-    func stop() -> Int32 {
+    public func stop() -> Int32 {
         let pid = readPID(from: config.pidURL)
         if pidAlive(pid), let pid {
             if kill(pid, SIGTERM) == 0 {
@@ -553,7 +558,7 @@ final class CLI {
         return 0
     }
 
-    func status() -> Int32 {
+    public func status() -> Int32 {
         let pid = readPID(from: config.pidURL)
         if pidAlive(pid), let pid { print("daemon: running pid \(pid)") } else { print("daemon: stopped") }
 
@@ -589,28 +594,6 @@ final class CLI {
     }
 }
 
-func usage() {
+public func usage() {
     print("usage: herdr-block-sleep [start|stop|status|daemon]")
-}
-
-let config = Config(environment: ProcessInfo.processInfo.environment)
-let command = CommandLine.arguments.dropFirst().first ?? "start"
-
-switch command {
-case "start":
-    exit(CLI(config: config).start())
-case "stop":
-    exit(CLI(config: config).stop())
-case "status":
-    exit(CLI(config: config).status())
-case "daemon":
-    signal(SIGINT) { _ in Termination.requested = true }
-    signal(SIGTERM) { _ in Termination.requested = true }
-    exit(Monitor(config: config).run())
-case "help", "--help", "-h":
-    usage()
-    exit(0)
-default:
-    usage()
-    exit(2)
 }

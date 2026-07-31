@@ -6,7 +6,7 @@ description = "Keep macOS awake while Herdr agents are working and the lid is op
 platforms = ["macos"]
 
 [[build]]
-command = ["swiftc", "src/main.swift", "-O", "-o", "bin/herdr-block-sleep"]
+command = ["/bin/sh", "-c", "swift build -c release --product herdr-block-sleep && mkdir -p bin && cp .build/release/herdr-block-sleep bin/herdr-block-sleep"]
 platforms = ["macos"]
 
 [[startup]]

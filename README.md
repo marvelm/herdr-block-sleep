@@ -22,14 +22,14 @@ After this repository is published, install it with Herdr:
 herdr plugin install marvelm/herdr-block-sleep
 ```
 
-Herdr clones the repository, runs the manifest build command, and registers the plugin:
-
-```toml
-[[build]]
-command = ["swiftc", "src/main.swift", "-O", "-o", "bin/herdr-block-sleep"]
-```
+Herdr clones the repository, runs the build command, and registers the plugin:
 
 On first install, you'll need to manually invoke the plugin to start:
+
+```sh
+herdr plugin action invoke start --plugin dev.herdr-block-sleep
+```
+
 
 ```sh
 herdr plugin action invoke start --plugin dev.herdr-block-sleep
@@ -41,7 +41,8 @@ herdr plugin action invoke start --plugin dev.herdr-block-sleep
 
 ```sh
 cd ~/dev/herdr-block-sleep
-swiftc src/main.swift -O -o bin/herdr-block-sleep
+swift build -c release --product herdr-block-sleep
+mkdir -p bin && cp .build/release/herdr-block-sleep bin/herdr-block-sleep
 herdr plugin link .
 herdr plugin action invoke start --plugin dev.herdr-block-sleep
 ```
