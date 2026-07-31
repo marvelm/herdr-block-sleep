@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import IOKit
 import IOKit.pwr_mgt
 
 struct Config {
@@ -400,14 +401,16 @@ final class Monitor {
     }
 
     private func lidState() -> String? {
-        guard let output = try? run("/usr/sbin/ioreg", ["-r", "-k", "AppleClamshellState", "-d", "1"]).stdout else {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard service != MACH_PORT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
+
+        guard let property = IORegistryEntryCreateCFProperty(service, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue(),
+              let closed = (property as? NSNumber)?.boolValue else {
             return nil
         }
-        for line in output.split(separator: "\n") where line.contains("AppleClamshellState") {
-            if line.contains("= Yes") { return "Yes" }
-            if line.contains("= No") { return "No" }
-        }
-        return nil
+
+        return closed ? "Yes" : "No"
     }
 
     private func agentSnapshot() throws -> AgentSnapshot {
