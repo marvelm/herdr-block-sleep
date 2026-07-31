@@ -37,13 +37,27 @@ Update to the latest tagged release through Herdr:
 herdr plugin action invoke update --plugin dev.herdr-block-sleep
 ```
 
-Or run the updater directly from a checkout:
+Or run the updater directly after cloning the repository:
 
 ```sh
 python3 scripts/update.py
 ```
 
 If you hit GitHub API rate limits while resolving tags, set `GITHUB_TOKEN` before running the updater.
+
+## Uninstall
+
+Stop the monitor before uninstalling so the daemon releases any active power assertions:
+
+```sh
+herdr plugin action invoke stop --plugin dev.herdr-block-sleep
+herdr plugin uninstall dev.herdr-block-sleep
+```
+Check for leftover assertions:
+
+```sh
+pmset -g assertions | grep 'herdr-block-sleep'
+```
 
 ## Local development install
 
@@ -56,8 +70,6 @@ mkdir -p bin && cp .build/release/herdr-block-sleep bin/herdr-block-sleep
 herdr plugin link .
 herdr plugin action invoke start --plugin dev.herdr-block-sleep
 ```
-
-The plugin manifest calls the Swift binary directly; there is no shell wrapper.
 
 Check status:
 
@@ -72,7 +84,7 @@ Stop the monitor:
 herdr plugin action invoke stop --plugin dev.herdr-block-sleep
 ```
 
-Uninstall or unlink:
+Unlink the local development plugin:
 
 ```sh
 herdr plugin unlink dev.herdr-block-sleep
