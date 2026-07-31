@@ -31,9 +31,21 @@ herdr plugin action invoke start --plugin dev.herdr-block-sleep
 ```
 
 
+## Update an installed release
+
+Update to the latest tagged release through Herdr:
+
 ```sh
-herdr plugin action invoke start --plugin dev.herdr-block-sleep
+herdr plugin action invoke update --plugin dev.herdr-block-sleep
 ```
+
+Or run the updater directly from a checkout:
+
+```sh
+python3 scripts/update.py
+```
+
+If you hit GitHub API rate limits while resolving tags, set `GITHUB_TOKEN` before running the updater.
 
 ## Local development install
 

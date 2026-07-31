@@ -29,3 +29,9 @@ id = "status"
 title = "Show block-sleep status"
 contexts = ["global"]
 command = ["./bin/herdr-block-sleep", "status"]
+
+[[actions]]
+id = "update"
+title = "Update to latest tagged release"
+contexts = ["global"]
+command = ["python3", "scripts/update.py"]
