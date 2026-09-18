@@ -1,6 +1,6 @@
 id = "dev.herdr-block-sleep"
 name = "Block Sleep"
-version = "0.1.0"
+version = "0.1.1"
 min_herdr_version = "0.7.0"
 description = "Keep macOS awake while Herdr agents are working and the lid is open."
 platforms = ["macos"]
