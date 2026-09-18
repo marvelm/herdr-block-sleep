@@ -244,8 +244,8 @@ public final class Monitor {
     private let config: Config
     private let fileManager = FileManager.default
     private var assertionIDs: [IOPMAssertionID] = []
+    private var logHandle: FileHandle?
     private var running = true
-
     public init(config: Config) {
         self.config = config
     }
@@ -267,26 +267,33 @@ public final class Monitor {
         var failures = 0
 
         while running && !Termination.requested {
-            do {
-                let snapshot = try refreshAndApply(reason: "bootstrap")
-                failures = 0
-                try eventLoop(snapshot: snapshot)
-            } catch {
-                failures += 1
-                releaseAssertion()
-                writeStatus(lid: lidState(), workingAgents: nil, assertionActive: false, reason: "herdr-api-failed")
-                log("event client failed failures=\(failures) error=\(error)")
-                if failures >= config.maxFailures {
-                    log("exiting after repeated Herdr API failures")
-                    cleanup()
-                    return 0
+            let shouldContinue = autoreleasepool { () -> Bool in
+                do {
+                    let snapshot = try refreshAndApply(reason: "bootstrap")
+                    failures = 0
+                    try eventLoop(snapshot: snapshot)
+                    return true
+                } catch {
+                    failures += 1
+                    releaseAssertion()
+                    writeStatus(lid: lidState(), workingAgents: nil, assertionActive: false, reason: "herdr-api-failed")
+                    log("event client failed failures=\(failures) error=\(error)")
+                    if failures >= config.maxFailures {
+                        log("exiting after repeated Herdr API failures")
+                        return false
+                    }
+                    sleep(config.lidCheckSeconds)
+                    return true
                 }
-                sleep(config.lidCheckSeconds)
+            }
+            guard shouldContinue else {
+                cleanup()
+                return 0
             }
         }
 
-        cleanup()
         log("native monitor stopped")
+        cleanup()
         return 0
     }
 
@@ -304,23 +311,27 @@ public final class Monitor {
         var currentSnapshot = snapshot
 
         while running && !Termination.requested {
-            let gotEvent = try client.waitForEvent(timeoutSeconds: config.lidCheckSeconds)
-            if gotEvent {
-                log("received Herdr event; refreshing agent snapshot")
-                let refreshed = try refreshAndApply(reason: "event")
-                currentSnapshot = refreshed
-                if Set(refreshed.paneIDs) != subscribedPaneIDs {
-                    log("pane set changed; rebuilding event subscription")
-                    return
+            let shouldContinue = try autoreleasepool { () throws -> Bool in
+                let gotEvent = try client.waitForEvent(timeoutSeconds: config.lidCheckSeconds)
+                if gotEvent {
+                    log("received Herdr event; refreshing agent snapshot")
+                    let refreshed = try refreshAndApply(reason: "event")
+                    currentSnapshot = refreshed
+                    if Set(refreshed.paneIDs) != subscribedPaneIDs {
+                        log("pane set changed; rebuilding event subscription")
+                        return false
+                    }
+                    return true
                 }
-                continue
-            }
 
-            apply(workingCount: currentSnapshot.workingCount, trigger: "lid-check")
-            if Date().timeIntervalSince(started) >= config.reconcileSeconds {
-                log("reconcile interval elapsed; refreshing agent snapshot")
-                return
+                apply(workingCount: currentSnapshot.workingCount, trigger: "lid-check")
+                if Date().timeIntervalSince(started) >= config.reconcileSeconds {
+                    log("reconcile interval elapsed; refreshing agent snapshot")
+                    return false
+                }
+                return true
             }
+            guard shouldContinue else { return }
         }
     }
 
@@ -348,19 +359,31 @@ public final class Monitor {
 
     private func cleanup() {
         releaseAssertion()
+        closeLog()
         try? fileManager.removeItem(at: config.pidURL)
     }
 
     private func log(_ message: String) {
         let line = "\(timestamp()) \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
-        if fileManager.fileExists(atPath: config.logURL.path), let handle = try? FileHandle(forWritingTo: config.logURL) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: data)
-        } else {
-            try? data.write(to: config.logURL, options: .atomic)
+
+        do {
+            if logHandle == nil {
+                if !fileManager.fileExists(atPath: config.logURL.path) {
+                    fileManager.createFile(atPath: config.logURL.path, contents: nil)
+                }
+                logHandle = try FileHandle(forWritingTo: config.logURL)
+            }
+            try logHandle?.seekToEnd()
+            try logHandle?.write(contentsOf: data)
+        } catch {
+            closeLog()
         }
+    }
+
+    private func closeLog() {
+        try? logHandle?.close()
+        logHandle = nil
     }
 
     private func writeStatus(lid: String?, workingAgents: Int?, assertionActive: Bool, reason: String) {
